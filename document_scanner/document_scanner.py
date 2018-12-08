@@ -3,7 +3,6 @@ import cv2
 import sys
 import os
 import imutils
-from skimage.filters import threshold_local
 
 class DocumentScanner:
 	def __init__(self):
