@@ -10,8 +10,9 @@ def Image(path):
 	image = cv2.imread(path)
 	ds = document_scanner.DocumentScanner()
 	output = ds.Scan(image,True)
-	cv2.imshow("Input",imutils.resize(image, height = 500))
-	cv2.imshow("Output",output)
+	cv2.imshow("Input",imutils.resize(image, height = 800))
+
+	cv2.imshow("Output",imutils.resize(output, height = 800))
 	cv2.waitKey(0)
 
 
