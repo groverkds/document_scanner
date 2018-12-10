@@ -26,7 +26,8 @@ class DocumentScanner:
 			page = self.straighten_and_crop(page_corners,original)
 			page = self.threshold(page,perform_threshold)
 		
-		except:
+		except Exception as e:
+			print(e)
 			page = original
 		
 		return page
@@ -35,8 +36,8 @@ class DocumentScanner:
 	def find_page(self,edge_map):
 		
 		contours = cv2.findContours(edge_map.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-		contours = imutils.grab_contours(cnts)
-		contours = sorted(cnts, key = cv2.contourArea, reverse = True)
+		contours = imutils.grab_contours(contours)
+		contours = sorted(contours, key = cv2.contourArea, reverse = True)
 		
 		for c in contours:
 			peri = cv2.arcLength(c, True)
