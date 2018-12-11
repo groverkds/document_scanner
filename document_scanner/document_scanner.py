@@ -3,6 +3,8 @@ import cv2
 import sys
 import os
 import imutils
+from PIL import Image
+import pytesseract
 
 class DocumentScanner:
 	def __init__(self):
@@ -76,3 +78,10 @@ class DocumentScanner:
 			page = cv2.adaptiveThreshold(page,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,page.shape[0]//10+1,page.shape[0]//100+1)		
 		
 		return page
+
+class TextConverter:
+	def __init__(self):
+		pass
+
+	def ConvertImageToText(self,image):
+		return pytesseract.image_to_string(Image.fromarray(image), lang='eng')

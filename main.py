@@ -7,12 +7,20 @@ import cv2
 import imutils
 import document_scanner.document_scanner as document_scanner
 def Image(path):
+	
 	image = cv2.imread(path)
 	ds = document_scanner.DocumentScanner()
 	output = ds.Scan(image,True)
+	
+	tc = document_scanner.TextConverter()
+	text = tc.ConvertImageToText(output)
+	print(text)
+	
 	cv2.imshow("Input",imutils.resize(image, height = 800))
-
+	
+	#cv2.imshow("Output",output)
 	cv2.imshow("Output",imutils.resize(output, height = 800))
+	
 	cv2.waitKey(0)
 
 
