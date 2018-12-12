@@ -84,4 +84,9 @@ class TextConverter:
 		pass
 
 	def ConvertImageToText(self,image):
+		try:
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+			image = cv2.adaptiveThreshold(image,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,image.shape[0]//10+1,image.shape[0]//100+1)		
+		except:
+			pass
 		return pytesseract.image_to_string(Image.fromarray(image), lang='eng')
