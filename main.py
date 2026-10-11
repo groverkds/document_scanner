@@ -1,9 +1,5 @@
-import numpy as np
 import cv2
-import sys
-import os
 import argparse
-import cv2
 import document_scanner.document_scanner as document_scanner
 def Image(path):
 
