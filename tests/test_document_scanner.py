@@ -20,7 +20,7 @@ def rotate(image, degrees):
 
 
 def load(name):
-    image = cv2.imread(str(ROOT / name))
+    image = cv2.imread(str(ROOT / "examples" / name))
     assert image is not None, name
     return image
 

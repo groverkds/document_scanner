@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "document-scanner"
+version = "1.0.0"
+description = "Scan documents from photographs using OpenCV, with optional OCR through Tesseract."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Karandeep Singh Grover" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python>=4.10",
+    "pytesseract>=0.3.13",
+    "Pillow>=11.0",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Graphics :: Capture :: Scanners",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    # Black changes its style once a year; stay on one year's style until upgrading on purpose
+    "black>=26,<27",
+]
+
+[project.scripts]
+document-scanner = "document_scanner.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/groverkds/document_scanner"
+
+[tool.setuptools]
+packages = ["document_scanner"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.black]
+target-version = ["py311"]

@@ -6,12 +6,14 @@ from pathlib import Path
 import cv2
 import pytesseract
 
+import document_scanner as package
 from document_scanner import document_scanner
 
 DESCRIPTION = "Scan documents from photographs: find the page, straighten it and optionally extract its text."
 
 def parse_args(argv):
-	parser = argparse.ArgumentParser(description=DESCRIPTION)
+	parser = argparse.ArgumentParser(prog="document-scanner", description=DESCRIPTION)
+	parser.add_argument("--version", action="version", version="%(prog)s " + package.__version__)
 	parser.add_argument("images", nargs="*", metavar="IMAGE", help="photo(s) of a document")
 	parser.add_argument("--image", dest="legacy_images", action="append", default=[], metavar="IMAGE", help=argparse.SUPPRESS)
 	parser.add_argument("-o", "--output", type=Path, metavar="PATH",

@@ -138,7 +138,7 @@ def test_show_opens_windows_when_display_available(photo, monkeypatch, no_tesser
 @pytest.mark.skipif(shutil.which("tesseract") is None, reason="Tesseract is not installed")
 def test_main_script_end_to_end(tmp_path):
     receipt = tmp_path / "receipt.jpg"
-    shutil.copy(ROOT / "receipt.jpg", receipt)
+    shutil.copy(ROOT / "examples" / "receipt.jpg", receipt)
     result = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), str(receipt), "--ocr"], capture_output=True, text=True, cwd=tmp_path
     )
@@ -146,3 +146,18 @@ def test_main_script_end_to_end(tmp_path):
     assert "WHOLE FOODS MARKET" in result.stdout
     scan = cv2.imread(str(tmp_path / "receipt_scanned.png"), cv2.IMREAD_UNCHANGED)
     assert scan.shape[0] > scan.shape[1]  # rotated upright: the receipt is portrait
+
+
+def test_version(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["--version"])
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.startswith("document-scanner ")
+
+
+def test_runs_as_python_module():
+    result = subprocess.run(
+        [sys.executable, "-m", "document_scanner", "--help"], capture_output=True, text=True, cwd=ROOT
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("usage: document-scanner")

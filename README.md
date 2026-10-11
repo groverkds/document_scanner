@@ -13,11 +13,12 @@ Scanned pages are rotated so their text is upright using Tesseract's orientation
 (`osd.traineddata`, included in the standard Tesseract packages). Pages with too little text are left as photographed.
 
 ```
-pip install -r requirements.txt
-python3 main.py receipt.jpg
+pip install .
+document-scanner examples/receipt.jpg
 ```
 
-This saves the scan as `receipt_scanned.png` next to the photo. Options:
+This saves the scan as `examples/receipt_scanned.png`, next to the photo.
+`python -m document_scanner` and `python3 main.py` (from a checkout) work the same way. Options:
 
 | Option | Effect |
 | --- | --- |
@@ -28,15 +29,26 @@ This saves the scan as `receipt_scanned.png` next to the photo. Options:
 | `--ocr` | Print the text found on the page |
 | `--show` | Show the photo and the scan in windows |
 
-Several photos can be scanned at once, e.g. `python3 main.py *.jpg --ocr`.
+Several photos can be scanned at once, e.g. `document-scanner photos/*.jpg --ocr`.
 If no page outline is found, the photo is saved unchanged and a warning is printed.
 The exit status is 1 if any photo could not be read or saved.
 
-Running tests:
+It can also be used as a library:
+
+```python
+import cv2
+from document_scanner.document_scanner import DocumentScanner, TextConverter
+
+scan = DocumentScanner().Scan(cv2.imread("photo.jpg"), perform_threshold=True, perform_auto_rotate=True)
+text = TextConverter().ConvertImageToText(scan)
+```
+
+Development:
 
 ```
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -e ".[dev]"
 python -m pytest
+black .
 ```
 
-Tests that need the Tesseract engine are skipped if it is not installed.
+Tests that need the Tesseract engine are skipped if it is not installed. Code is formatted with [Black](https://black.readthedocs.io/).
