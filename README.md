@@ -6,8 +6,10 @@ Thanks to Adrian Rosebrock(www.pyimagesearch.com) for an awesome tutorial which 
 
 Steps to run:
 
-install opencv (version >= 3.3) (pip3 install opencv-python)
-install numpy (pip3 install numpy)
-install imutils (pip3 install imutils)
+Requires Python 3.11 or newer (tested on 3.14) and the [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) engine
+(e.g. `sudo apt install tesseract-ocr` or `brew install tesseract`).
 
-python3 main.py --image reciept.jpeg
+```
+pip install -r requirements.txt
+python3 main.py --image receipt.jpg
+```

@@ -1,5 +1,4 @@
-numpy==1.13.3
-opencv_python==3.4.4.19
-pytesseract==0.2.5
-imutils==0.5.1
-Pillow==8.2.0
+numpy>=2.0
+opencv-python>=4.10
+pytesseract>=0.3.13
+Pillow>=11.0

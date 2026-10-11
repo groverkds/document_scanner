@@ -4,7 +4,6 @@ import sys
 import os
 import argparse
 import cv2
-import imutils
 import document_scanner.document_scanner as document_scanner
 def Image(path):
 
@@ -16,10 +15,10 @@ def Image(path):
 	text = tc.ConvertImageToText(output)
 	print(text)
 	
-	cv2.imshow("Input",imutils.resize(image, height = 800))
+	cv2.imshow("Input",document_scanner.resize_to_height(image, 800))
 	
 	#cv2.imshow("Output",output)
-	cv2.imshow("Output",imutils.resize(output, height = 800 if output.shape[0]>800 else output.shape[0]))
+	cv2.imshow("Output",document_scanner.resize_to_height(output, 800 if output.shape[0]>800 else output.shape[0]))
 	
 	cv2.waitKey(0)
 
