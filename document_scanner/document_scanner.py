@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 from PIL import Image
 import pytesseract
+from pytesseract import Output
 
 def resize_to_height(image, height):
 	ratio = height / image.shape[0]
@@ -20,6 +21,25 @@ def order_corners(corners):
 	d = np.diff(corners, axis=1).ravel()
 	return np.array([corners[np.argmin(s)], corners[np.argmin(d)], corners[np.argmax(s)], corners[np.argmax(d)]])
 
+# Clockwise rotations, keyed by the "rotate" value from Tesseract's orientation detection
+ROTATIONS = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+
+# Below this orientation confidence the detected rotation is ignored (images without
+# text score around 0.5, the sample receipt about 2-4, text-heavy pages over 10)
+MIN_ORIENTATION_CONFIDENCE = 1.0
+
+def auto_rotate(page):
+	# Rotates the page so its text is upright, using Tesseract's orientation detection
+	gray = page if page.ndim == 2 else adaptive_threshold(cv2.cvtColor(page, cv2.COLOR_BGR2GRAY))
+	try:
+		osd = pytesseract.image_to_osd(gray, output_type=Output.DICT)
+	except pytesseract.TesseractError:
+		# Raised when the page has too little text to detect orientation
+		return page
+	if osd["orientation_conf"] < MIN_ORIENTATION_CONFIDENCE or osd["rotate"] not in ROTATIONS:
+		return page
+	return cv2.rotate(page, ROTATIONS[osd["rotate"]])
+
 class PageNotFoundError(Exception):
 	pass
 
@@ -30,7 +50,7 @@ class DocumentScanner:
 	def __init__(self):
 		pass
 
-	def Scan(self,image,perform_threshold=False):
+	def Scan(self,image,perform_threshold=False,perform_auto_rotate=False):
 		
 		original = image.copy()
 		
@@ -46,6 +66,8 @@ class DocumentScanner:
 			page_corners = np.array((ratio*np.array(page_corners,dtype="float32")),dtype="int32")
 
 			page = self.straighten_and_crop(page_corners,original)
+			if perform_auto_rotate:
+				page = auto_rotate(page)
 			page = self.threshold(page,perform_threshold)
 		
 		except PageNotFoundError as e:

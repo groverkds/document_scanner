@@ -5,7 +5,7 @@ def Image(path):
 
 	image = cv2.imread(path)
 	ds = document_scanner.DocumentScanner()
-	output = ds.Scan(image,True)
+	output = ds.Scan(image,perform_threshold=True,perform_auto_rotate=True)
 	
 	tc = document_scanner.TextConverter()
 	text = tc.ConvertImageToText(output)
