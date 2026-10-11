@@ -14,8 +14,23 @@ Scanned pages are rotated so their text is upright using Tesseract's orientation
 
 ```
 pip install -r requirements.txt
-python3 main.py --image receipt.jpg
+python3 main.py receipt.jpg
 ```
+
+This saves the scan as `receipt_scanned.png` next to the photo. Options:
+
+| Option | Effect |
+| --- | --- |
+| `-o PATH`, `--output PATH` | Save the scan to `PATH` (single image only) |
+| `--no-save` | Don't save the scan |
+| `--no-threshold` | Keep the scan in color instead of black and white |
+| `--no-rotate` | Don't turn the page so its text is upright |
+| `--ocr` | Print the text found on the page |
+| `--show` | Show the photo and the scan in windows |
+
+Several photos can be scanned at once, e.g. `python3 main.py *.jpg --ocr`.
+If no page outline is found, the photo is saved unchanged and a warning is printed.
+The exit status is 1 if any photo could not be read or saved.
 
 Running tests:
 

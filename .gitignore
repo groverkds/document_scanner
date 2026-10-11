@@ -105,3 +105,6 @@ venv.bak/
 
 # ruff
 .ruff_cache/
+
+# Scans written next to the sample photos
+*_scanned.png
