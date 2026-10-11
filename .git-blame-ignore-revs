@@ -1,0 +1,4 @@
+# Style-only commits hidden from git blame (git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# Format code with Black
+3203d65ba60488feb59790374d07d679e18cc8cf
