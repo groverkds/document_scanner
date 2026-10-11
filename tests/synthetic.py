@@ -14,7 +14,9 @@ def text_page(width=600, height=800, seed=0):
         x = 50
         while x < width - 80:
             length = int(rng.integers(20, 90))
-            cv2.rectangle(page, (x, y), (min(x + length, width - 50), y + 10), (40, 40, 40), -1)
+            cv2.rectangle(
+                page, (x, y), (min(x + length, width - 50), y + 10), (40, 40, 40), -1
+            )
             x += length + 12
     cv2.rectangle(page, (30, 25), (110, 45), (0, 0, 255), -1)
     return page
@@ -30,7 +32,9 @@ def background(kind, seed=0):
     if kind == "wood":
         x = np.arange(WIDTH)[None, :] + 25 * np.sin(np.arange(HEIGHT)[:, None] / 40.0)
         value = 90 + 40 * np.sin(x / 9.0) + rng.normal(0, 12, (HEIGHT, WIDTH))
-        return np.clip(np.stack([value * 0.55, value * 0.75, value], -1), 0, 255).astype(np.uint8)
+        return np.clip(
+            np.stack([value * 0.55, value * 0.75, value], -1), 0, 255
+        ).astype(np.uint8)
     if kind == "noise":
         return np.clip(rng.normal(90, 45, (HEIGHT, WIDTH, 3)), 0, 255).astype(np.uint8)
     raise ValueError(kind)
@@ -38,7 +42,14 @@ def background(kind, seed=0):
 
 def rotated_quad(angle, cx=600, cy=450, width=500, height=620):
     """Corners (top-left, top-right, bottom-right, bottom-left) of a rectangle rotated clockwise by `angle` degrees."""
-    corners = np.float32([[-width / 2, -height / 2], [width / 2, -height / 2], [width / 2, height / 2], [-width / 2, height / 2]])
+    corners = np.float32(
+        [
+            [-width / 2, -height / 2],
+            [width / 2, -height / 2],
+            [width / 2, height / 2],
+            [-width / 2, height / 2],
+        ]
+    )
     a = np.deg2rad(angle)
     rotation = np.float32([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
     return corners @ rotation.T + np.float32([cx, cy])
@@ -63,7 +74,10 @@ def corner_error(found, truth):
     found, truth = np.float32(found), np.float32(truth)
     dx, dy = truth[1] - truth[0]
     shifts = range(4) if abs(abs(np.degrees(np.arctan2(dy, dx))) - 45) < 1 else [0]
-    return min(float(np.max(np.linalg.norm(found - np.roll(truth, k, axis=0), axis=1))) for k in shifts)
+    return min(
+        float(np.max(np.linalg.norm(found - np.roll(truth, k, axis=0), axis=1)))
+        for k in shifts
+    )
 
 
 def hard_cases():
@@ -79,13 +93,26 @@ def hard_cases():
     quad = rotated_quad(8)
     image = photo(quad)
     bottom_middle = (quad[2] + quad[3]) / 2
-    cv2.ellipse(image, (int(bottom_middle[0]), int(bottom_middle[1])), (45, 80), 15, 0, 360, (120, 150, 210), -1)
+    cv2.ellipse(
+        image,
+        (int(bottom_middle[0]), int(bottom_middle[1])),
+        (45, 80),
+        15,
+        0,
+        360,
+        (120, 150, 210),
+        -1,
+    )
     cases.append(("thumb_over_edge", image, quad))
 
     quad = rotated_quad(5)
     image = photo(quad)
     top_right = quad[1]
-    cv2.fillConvexPoly(image, np.int32([top_right, top_right + [-45, -5], top_right + [5, 45]]), (40, 45, 50))
+    cv2.fillConvexPoly(
+        image,
+        np.int32([top_right, top_right + [-45, -5], top_right + [5, 45]]),
+        (40, 45, 50),
+    )
     cases.append(("dog_eared_corner", image, quad))
 
     quad = rotated_quad(10, width=230, height=300)
@@ -97,7 +124,9 @@ def hard_cases():
         canvas[250:650, 300:600] = 255
         matrix = cv2.getRotationMatrix2D((450, 450), angle, 1.0)
         image = cv2.warpAffine(canvas, matrix, (900, 900), borderValue=(40, 40, 40))
-        quad = cv2.transform(np.float32([[[300, 250], [599, 250], [599, 649], [300, 649]]]), matrix)[0]
+        quad = cv2.transform(
+            np.float32([[[300, 250], [599, 250], [599, 649], [300, 649]]]), matrix
+        )[0]
         cases.append((f"broken_outline{angle:+d}", image, quad))
     return cases
 
@@ -110,14 +139,18 @@ def easy_cases():
         cases.append((f"rotated{angle:+d}", photo(quad), quad))
     rng = np.random.default_rng(1)
     for i in range(4):
-        quad = rotated_quad(rng.uniform(-20, 20)) + rng.uniform(-60, 60, (4, 2)).astype(np.float32)
+        quad = rotated_quad(rng.uniform(-20, 20)) + rng.uniform(-60, 60, (4, 2)).astype(
+            np.float32
+        )
         cases.append((f"perspective{i}", photo(quad, seed=i), quad))
     for kind in ("wood", "noise"):
         quad = rotated_quad(-15)
         cases.append((f"{kind}_background", photo(quad, kind), quad))
 
     quad = rotated_quad(-10)
-    shadow = photo(quad).astype(np.float32) * np.linspace(0.45, 1.0, WIDTH)[None, :, None]
+    shadow = (
+        photo(quad).astype(np.float32) * np.linspace(0.45, 1.0, WIDTH)[None, :, None]
+    )
     cases.append(("shadow", shadow.astype(np.uint8), quad))
 
     quad = rotated_quad(12)
@@ -143,5 +176,12 @@ def pageless_images():
         ("noise_background", background("noise")),
     ]
     for seed in range(5):
-        images.append((f"random_pixels{seed}", np.random.default_rng(seed).integers(0, 256, (800, 600, 3), dtype=np.uint8)))
+        images.append(
+            (
+                f"random_pixels{seed}",
+                np.random.default_rng(seed).integers(
+                    0, 256, (800, 600, 3), dtype=np.uint8
+                ),
+            )
+        )
     return images

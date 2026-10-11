@@ -28,7 +28,11 @@ def no_tesseract_calls(monkeypatch):
     calls = []
     monkeypatch.setattr(cli, "tesseract_available", lambda: True)
     monkeypatch.setattr(ds, "auto_rotate", lambda page: calls.append("rotate") or page)
-    monkeypatch.setattr(ds.TextConverter, "ConvertImageToText", lambda self, image: calls.append("ocr") or "TEXT")
+    monkeypatch.setattr(
+        ds.TextConverter,
+        "ConvertImageToText",
+        lambda self, image: calls.append("ocr") or "TEXT",
+    )
     return calls
 
 
@@ -59,7 +63,9 @@ def test_no_rotate_and_no_save(photo, no_tesseract_calls):
     assert not photo.with_name("photo_scanned.png").exists()
 
 
-def test_ocr_prints_text_with_headers_for_several_images(photo, tmp_path, no_tesseract_calls, capsys):
+def test_ocr_prints_text_with_headers_for_several_images(
+    photo, tmp_path, no_tesseract_calls, capsys
+):
     second = tmp_path / "second.jpg"
     shutil.copy(photo, second)
     assert cli.main([str(photo), str(second), "--ocr", "--no-save"]) == 0
@@ -72,7 +78,9 @@ def test_ocr_prints_only_text_for_one_image(photo, no_tesseract_calls, capsys):
     assert capsys.readouterr().out == "TEXT\n"
 
 
-def test_unreadable_image_is_reported_and_others_still_scanned(photo, tmp_path, no_tesseract_calls, capsys):
+def test_unreadable_image_is_reported_and_others_still_scanned(
+    photo, tmp_path, no_tesseract_calls, capsys
+):
     broken = tmp_path / "broken.jpg"
     broken.write_text("not an image")
     assert cli.main([str(tmp_path / "missing.jpg"), str(broken), str(photo)]) == 1
@@ -82,7 +90,9 @@ def test_unreadable_image_is_reported_and_others_still_scanned(photo, tmp_path, 
     assert photo.with_name("photo_scanned.png").exists()
 
 
-def test_page_not_found_saves_original_with_warning(tmp_path, no_tesseract_calls, capsys):
+def test_page_not_found_saves_original_with_warning(
+    tmp_path, no_tesseract_calls, capsys
+):
     blank = tmp_path / "blank.png"
     cv2.imwrite(str(blank), np.full((400, 300, 3), 255, np.uint8))
     assert cli.main([str(blank)]) == 0
@@ -94,8 +104,14 @@ def test_page_not_found_saves_original_with_warning(tmp_path, no_tesseract_calls
     "argv, message",
     [
         ([], "no image given"),
-        (["a.jpg", "b.jpg", "-o", "x.png"], "--output can only be used with a single image"),
-        (["a.jpg", "-o", "x.png", "--no-save"], "--output and --no-save cannot be used together"),
+        (
+            ["a.jpg", "b.jpg", "-o", "x.png"],
+            "--output can only be used with a single image",
+        ),
+        (
+            ["a.jpg", "-o", "x.png", "--no-save"],
+            "--output and --no-save cannot be used together",
+        ),
     ],
 )
 def test_invalid_arguments(argv, message, capsys):
@@ -107,7 +123,9 @@ def test_invalid_arguments(argv, message, capsys):
 
 def test_without_tesseract_rotation_is_skipped_with_warning(photo, monkeypatch, capsys):
     monkeypatch.setattr(cli, "tesseract_available", lambda: False)
-    monkeypatch.setattr(ds, "auto_rotate", lambda page: pytest.fail("auto_rotate called"))
+    monkeypatch.setattr(
+        ds, "auto_rotate", lambda page: pytest.fail("auto_rotate called")
+    )
     assert cli.main([str(photo)]) == 0
     assert "will not be rotated" in capsys.readouterr().err
 
@@ -118,14 +136,18 @@ def test_without_tesseract_ocr_is_an_error(photo, monkeypatch, capsys):
     assert "--ocr needs the Tesseract OCR engine" in capsys.readouterr().err
 
 
-def test_show_without_display_warns_instead_of_crashing(photo, monkeypatch, no_tesseract_calls, capsys):
+def test_show_without_display_warns_instead_of_crashing(
+    photo, monkeypatch, no_tesseract_calls, capsys
+):
     monkeypatch.setattr(cli, "display_available", lambda: False)
     monkeypatch.setattr(cv2, "imshow", lambda *args: pytest.fail("imshow called"))
     assert cli.main([str(photo), "--show", "--no-save"]) == 0
     assert "no display available" in capsys.readouterr().err
 
 
-def test_show_opens_windows_when_display_available(photo, monkeypatch, no_tesseract_calls):
+def test_show_opens_windows_when_display_available(
+    photo, monkeypatch, no_tesseract_calls
+):
     shown = []
     monkeypatch.setattr(cli, "display_available", lambda: True)
     monkeypatch.setattr(cv2, "imshow", lambda name, image: shown.append(name))
@@ -135,14 +157,37 @@ def test_show_opens_windows_when_display_available(photo, monkeypatch, no_tesser
     assert shown == ["Photo", "Scan"]
 
 
-@pytest.mark.skipif(shutil.which("tesseract") is None, reason="Tesseract is not installed")
+@pytest.mark.skipif(
+    shutil.which("tesseract") is None, reason="Tesseract is not installed"
+)
 def test_main_script_end_to_end(tmp_path):
     receipt = tmp_path / "receipt.jpg"
-    shutil.copy(ROOT / "receipt.jpg", receipt)
+    shutil.copy(ROOT / "examples" / "receipt.jpg", receipt)
     result = subprocess.run(
-        [sys.executable, str(ROOT / "main.py"), str(receipt), "--ocr"], capture_output=True, text=True, cwd=tmp_path
+        [sys.executable, str(ROOT / "main.py"), str(receipt), "--ocr"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
     )
     assert result.returncode == 0, result.stderr
     assert "WHOLE FOODS MARKET" in result.stdout
     scan = cv2.imread(str(tmp_path / "receipt_scanned.png"), cv2.IMREAD_UNCHANGED)
     assert scan.shape[0] > scan.shape[1]  # rotated upright: the receipt is portrait
+
+
+def test_version(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["--version"])
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.startswith("document-scanner ")
+
+
+def test_runs_as_python_module():
+    result = subprocess.run(
+        [sys.executable, "-m", "document_scanner", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("usage: document-scanner")

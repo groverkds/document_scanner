@@ -10,17 +10,26 @@ from tests import synthetic
 
 ROOT = Path(__file__).resolve().parent.parent
 
-requires_tesseract = pytest.mark.skipif(shutil.which("tesseract") is None, reason="Tesseract is not installed")
+requires_tesseract = pytest.mark.skipif(
+    shutil.which("tesseract") is None, reason="Tesseract is not installed"
+)
 
-ROTATIONS = {0: None, 90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+ROTATIONS = {
+    0: None,
+    90: cv2.ROTATE_90_CLOCKWISE,
+    180: cv2.ROTATE_180,
+    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
 
 
 def rotate(image, degrees):
-    return image if ROTATIONS[degrees] is None else cv2.rotate(image, ROTATIONS[degrees])
+    return (
+        image if ROTATIONS[degrees] is None else cv2.rotate(image, ROTATIONS[degrees])
+    )
 
 
 def load(name):
-    image = cv2.imread(str(ROOT / name))
+    image = cv2.imread(str(ROOT / "examples" / name))
     assert image is not None, name
     return image
 
@@ -41,12 +50,14 @@ def blank_photo():
 
 # resize_to_height
 
+
 def test_resize_to_height_keeps_aspect_ratio():
     out = ds.resize_to_height(np.zeros((1000, 600, 3), np.uint8), 500)
     assert out.shape == (500, 300, 3)
 
 
 # adaptive_threshold
+
 
 def test_adaptive_threshold_works_for_every_height():
     # blockSize used to be height//10+1, which OpenCV rejects when it is even
@@ -59,7 +70,14 @@ def test_adaptive_threshold_works_for_every_height():
 @pytest.mark.parametrize("height", [1200, 1400, 2624])
 def test_adaptive_threshold_unchanged_where_old_block_size_was_valid(height):
     gray = np.random.default_rng(height).integers(0, 256, (height, 50), dtype=np.uint8)
-    expected = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, height // 10 + 1, height // 100 + 1)
+    expected = cv2.adaptiveThreshold(
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        height // 10 + 1,
+        height // 100 + 1,
+    )
     assert (ds.adaptive_threshold(gray) == expected).all()
 
 
@@ -83,19 +101,29 @@ def test_order_corners_at_45_degrees_returns_four_distinct_corners_clockwise():
     for start in range(4):
         ordered = ds.order_corners(np.roll(diamond, start, axis=0))
         assert len({tuple(c) for c in ordered.tolist()}) == 4
-        assert ordered.tolist() in [np.roll(diamond, k, axis=0).tolist() for k in range(4)]
+        assert ordered.tolist() in [
+            np.roll(diamond, k, axis=0).tolist() for k in range(4)
+        ]
 
 
 # detect_page
 
+
 @pytest.mark.parametrize(
-    "image, truth", [pytest.param(image, truth, id=name) for name, image, truth in synthetic.easy_cases() + synthetic.hard_cases()]
+    "image, truth",
+    [
+        pytest.param(image, truth, id=name)
+        for name, image, truth in synthetic.easy_cases() + synthetic.hard_cases()
+    ],
 )
 def test_detect_page_finds_corners(image, truth):
     assert synthetic.corner_error(ds.DocumentScanner().detect_page(image), truth) < 15
 
 
-@pytest.mark.parametrize("image", [pytest.param(image, id=name) for name, image in synthetic.pageless_images()])
+@pytest.mark.parametrize(
+    "image",
+    [pytest.param(image, id=name) for name, image in synthetic.pageless_images()],
+)
 def test_detect_page_finds_nothing_in_pageless_images(image):
     with pytest.raises(ds.PageNotFoundError):
         ds.DocumentScanner().detect_page(image)
@@ -116,14 +144,23 @@ def test_detect_page_on_samples_matches_original_detection(name, expected):
 
 def test_longest_sides_quad_recovers_cut_off_corner():
     # A 200x300 rectangle with its top-right corner cut off diagonally
-    outline = np.array([[0, 0], [170, 0], [200, 30], [200, 300], [0, 300]], np.int32).reshape(-1, 1, 2)
+    outline = np.array(
+        [[0, 0], [170, 0], [200, 30], [200, 300], [0, 300]], np.int32
+    ).reshape(-1, 1, 2)
     quad = ds.longest_sides_quad(outline)
-    assert synthetic.corner_error(ds.order_corners(quad), [[0, 0], [200, 0], [200, 300], [0, 300]]) < 1
+    assert (
+        synthetic.corner_error(
+            ds.order_corners(quad), [[0, 0], [200, 0], [200, 300], [0, 300]]
+        )
+        < 1
+    )
 
 
 def test_side_support_is_low_for_a_side_without_outline():
     outline = np.full((100, 100), 255, np.uint8)
-    cv2.polylines(outline, [np.int32([[10, 90], [10, 10], [90, 10], [90, 90]])], False, 0)  # bottom side missing
+    cv2.polylines(
+        outline, [np.int32([[10, 90], [10, 10], [90, 10], [90, 90]])], False, 0
+    )  # bottom side missing
     distance = cv2.distanceTransform(outline, cv2.DIST_L2, 3)
     quad = np.float32([[10, 10], [90, 10], [90, 90], [10, 90]])
     assert ds.side_support(quad, distance) < ds.MIN_SIDE_SUPPORT / 2
@@ -132,12 +169,19 @@ def test_side_support_is_low_for_a_side_without_outline():
 
 
 def test_touches_border():
-    assert ds.touches_border(np.float32([[1, 1], [399, 1], [399, 499], [1, 499]]), (500, 400))
-    assert ds.touches_border(np.float32([[50, 1], [300, 2], [300, 400], [50, 400]]), (500, 400))
-    assert not ds.touches_border(np.float32([[50, 40], [300, 40], [300, 400], [50, 400]]), (500, 400))
+    assert ds.touches_border(
+        np.float32([[1, 1], [399, 1], [399, 499], [1, 499]]), (500, 400)
+    )
+    assert ds.touches_border(
+        np.float32([[50, 1], [300, 2], [300, 400], [50, 400]]), (500, 400)
+    )
+    assert not ds.touches_border(
+        np.float32([[50, 40], [300, 40], [300, 400], [50, 400]]), (500, 400)
+    )
 
 
 # find_page / Scan without a page
+
 
 def test_find_page_raises_when_there_is_no_page():
     with pytest.raises(ds.PageNotFoundError):
@@ -160,6 +204,7 @@ def test_scan_returns_original_and_warns_when_no_page(capsys):
 
 # Scan geometry
 
+
 @pytest.mark.parametrize("angle", [-40, -20, -10, 0, 10, 20, 40])
 def test_scan_straightens_tilted_page_keeping_top_left(angle):
     out = ds.DocumentScanner().Scan(photo_of_page(angle))
@@ -179,8 +224,13 @@ def test_scan_sample_page():
 
 # auto_rotate
 
+
 def fake_osd(monkeypatch, rotate, confidence):
-    monkeypatch.setattr(ds.pytesseract, "image_to_osd", lambda *a, **k: {"rotate": rotate, "orientation_conf": confidence})
+    monkeypatch.setattr(
+        ds.pytesseract,
+        "image_to_osd",
+        lambda *a, **k: {"rotate": rotate, "orientation_conf": confidence},
+    )
 
 
 @pytest.mark.parametrize("degrees", [0, 90, 180, 270])
@@ -199,6 +249,7 @@ def test_auto_rotate_ignores_low_confidence(monkeypatch):
 def test_auto_rotate_leaves_page_when_tesseract_finds_too_little_text(monkeypatch):
     def raise_error(*args, **kwargs):
         raise ds.pytesseract.TesseractError(1, "Too few characters. Skipping this page")
+
     monkeypatch.setattr(ds.pytesseract, "image_to_osd", raise_error)
     page = np.zeros((10, 20, 3), np.uint8)
     assert ds.auto_rotate(page) is page
@@ -225,9 +276,16 @@ def test_scan_auto_rotates_samples_upright(name, upright_turn, degrees):
 
 # TextConverter
 
-def test_text_converter_thresholds_color_input_and_passes_grayscale_through(monkeypatch):
+
+def test_text_converter_thresholds_color_input_and_passes_grayscale_through(
+    monkeypatch,
+):
     seen = []
-    monkeypatch.setattr(ds.pytesseract, "image_to_string", lambda image, lang: seen.append(np.array(image)) or "")
+    monkeypatch.setattr(
+        ds.pytesseract,
+        "image_to_string",
+        lambda image, lang: seen.append(np.array(image)) or "",
+    )
     color = np.full((100, 80, 3), 200, np.uint8)
     gray = np.full((100, 80), 7, np.uint8)
     ds.TextConverter().ConvertImageToText(color)
@@ -239,6 +297,8 @@ def test_text_converter_thresholds_color_input_and_passes_grayscale_through(monk
 @requires_tesseract
 def test_ocr_reads_sample_receipt():
     scanner = ds.DocumentScanner()
-    page = scanner.Scan(load("receipt.jpg"), perform_threshold=True, perform_auto_rotate=True)
+    page = scanner.Scan(
+        load("receipt.jpg"), perform_threshold=True, perform_auto_rotate=True
+    )
     text = ds.TextConverter().ConvertImageToText(page)
     assert "WHOLE FOODS MARKET" in text

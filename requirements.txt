@@ -1,4 +1,0 @@
-numpy>=2.0
-opencv-python>=4.10
-pytesseract>=0.3.13
-Pillow>=11.0
