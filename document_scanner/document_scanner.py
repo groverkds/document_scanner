@@ -15,11 +15,12 @@ def adaptive_threshold(gray):
 	return cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,block_size,gray.shape[0]//100+1)
 
 def order_corners(corners):
-	# Returns corners as top-left, top-right, bottom-right, bottom-left
+	# Returns corners as top-left, top-right, bottom-right, bottom-left: sorted clockwise
+	# around their centre, starting from the corner closest to the image's top-left
 	corners = corners.reshape(4, 2)
-	s = corners.sum(axis=1)
-	d = np.diff(corners, axis=1).ravel()
-	return np.array([corners[np.argmin(s)], corners[np.argmin(d)], corners[np.argmax(s)], corners[np.argmax(d)]])
+	centre = corners.mean(axis=0)
+	corners = corners[np.argsort(np.arctan2(corners[:, 1] - centre[1], corners[:, 0] - centre[0]))]
+	return np.roll(corners, -np.argmin(corners.sum(axis=1)), axis=0)
 
 # Clockwise rotations, keyed by the "rotate" value from Tesseract's orientation detection
 ROTATIONS = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
@@ -43,8 +44,87 @@ def auto_rotate(page):
 class PageNotFoundError(Exception):
 	pass
 
+# Page detection works on a copy of the image resized to this height
+DETECTION_HEIGHT = 500
+
 # A page outline must cover at least this fraction of the image
-MIN_PAGE_AREA_FRACTION = 0.1
+MIN_PAGE_AREA_FRACTION = 0.05
+
+def edge_maps(gray):
+	# Yields edge maps to search for the page outline, from the most precise to the most forgiving
+	blurred = cv2.GaussianBlur(gray, (5,5), 0)
+	kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+	edges = cv2.Canny(blurred, 75, 200)
+	yield edges
+	# Close small gaps in the outline
+	yield cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+	# Lower thresholds based on the image's median brightness, for low-contrast backgrounds
+	median = np.median(blurred)
+	low_contrast = cv2.Canny(blurred, int(max(0, 0.67 * median) * 0.25), int(min(255, 1.33 * median) * 0.5))
+	yield cv2.morphologyEx(low_contrast, cv2.MORPH_CLOSE, kernel)
+	# Bright page against a darker background
+	_, mask = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+	yield cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (7,7)))
+
+def line_intersection(line1, line2):
+	(x1, y1), (x2, y2) = line1
+	(x3, y3), (x4, y4) = line2
+	denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+	if abs(denominator) < 1e-6:
+		return None
+	a = x1 * y2 - y1 * x2
+	b = x3 * y4 - y3 * x4
+	return np.array([(a * (x3 - x4) - (x1 - x2) * b) / denominator, (a * (y3 - y4) - (y1 - y2) * b) / denominator])
+
+def quad_from_lines(lines):
+	# Intersects four lines, given in order around the page, into four corners
+	corners = [line_intersection(lines[i - 1], lines[i]) for i in range(4)]
+	if any(c is None for c in corners):
+		return None
+	return np.array(corners, dtype="float32")
+
+def approximate_quad(contour):
+	# Returns four corners approximating the contour, or None if it is not four-sided
+	peri = cv2.arcLength(contour, True)
+	approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+	if len(approx) != 4:
+		return None
+	return approx.reshape(4, 2).astype("float32")
+
+def longest_sides_quad(contour):
+	# Corners cut off by a fold, or sides broken up by a finger, add short sides to the
+	# outline; intersecting its four longest sides recovers the page corners
+	approx = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, True), True).reshape(-1, 2).astype("float32")
+	if len(approx) < 4:
+		return None
+	sides = [(approx[i], approx[(i + 1) % len(approx)]) for i in range(len(approx))]
+	longest = sorted(np.argsort([-np.linalg.norm(b - a) for a, b in sides])[:4])
+	return quad_from_lines([sides[i] for i in longest])
+
+def side_support(quad, outline_distance):
+	# Fraction of the least supported side that lies on the outline; outline_distance is the
+	# distance transform of the outline, giving each pixel's distance to the nearest outline point
+	h, w = outline_distance.shape
+	support = 1.0
+	for i in range(4):
+		samples = np.linspace(quad[i], quad[(i + 1) % 4], 50)
+		x = np.clip(samples[:, 0].round().astype(int), 0, w - 1)
+		y = np.clip(samples[:, 1].round().astype(int), 0, h - 1)
+		inside = (samples[:, 0] >= 0) & (samples[:, 0] < w) & (samples[:, 1] >= 0) & (samples[:, 1] < h)
+		support = min(support, np.mean(inside & (outline_distance[y, x] <= 3)))
+	return support
+
+# Every side of a page outline must lie on the detected outline for at least this fraction of its length
+MIN_SIDE_SUPPORT = 0.6
+
+def touches_border(quad, shape, margin=3):
+	# True if a side of the quad runs along the image border (an outline of the image itself, not a page)
+	h, w = shape
+	for a, b in zip(quad, np.roll(quad, -1, axis=0)):
+		for axis, limit in ((0, w - 1), (1, h - 1)):
+			if max(a[axis], b[axis]) <= margin or min(a[axis], b[axis]) >= limit - margin:
+				return True
+	return False
 
 class DocumentScanner:
 	def __init__(self):
@@ -55,16 +135,7 @@ class DocumentScanner:
 		original = image.copy()
 		
 		try:
-			ratio = image.shape[0]/500
-			image = resize_to_height(image, 500)
-			gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-			gray = cv2.GaussianBlur(gray, (5,5), 0)
-			edge_map = cv2.Canny(gray, 75,200)
-			
-			page_corners = self.find_page(edge_map)
-			
-			page_corners = np.array((ratio*np.array(page_corners,dtype="float32")),dtype="int32")
-
+			page_corners = self.detect_page(image)
 			page = self.straighten_and_crop(page_corners,original)
 			if perform_auto_rotate:
 				page = auto_rotate(page)
@@ -77,20 +148,36 @@ class DocumentScanner:
 		return page
 
 
+	def detect_page(self,image):
+		# Returns the page corners in image coordinates, ordered top-left, top-right, bottom-right, bottom-left
+		ratio = image.shape[0] / DETECTION_HEIGHT
+		gray = cv2.cvtColor(resize_to_height(image, DETECTION_HEIGHT), cv2.COLOR_BGR2GRAY)
+		for edge_map in edge_maps(gray):
+			try:
+				return self.find_page(edge_map) * ratio
+			except PageNotFoundError:
+				pass
+		raise PageNotFoundError("no page outline found")
+
 	def find_page(self,edge_map):
 		
-		contours, _ = cv2.findContours(edge_map.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+		contours, _ = cv2.findContours(edge_map.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 		contours = sorted(contours, key = cv2.contourArea, reverse = True)
 		min_area = MIN_PAGE_AREA_FRACTION * edge_map.shape[0] * edge_map.shape[1]
 		
 		for c in contours:
 			if cv2.contourArea(c) < min_area:
 				break
-			peri = cv2.arcLength(c, True)
-			approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-		
-			if len(approx) == 4 and cv2.contourArea(approx) >= min_area:
-				return order_corners(approx)
+			outline = np.full(edge_map.shape, 255, np.uint8)
+			cv2.drawContours(outline, [c], -1, 0, 1)
+			outline_distance = cv2.distanceTransform(outline, cv2.DIST_L2, 3)
+			for quad in (approximate_quad(cv2.convexHull(c)), longest_sides_quad(c)):
+				if quad is None or not cv2.isContourConvex(quad.astype("int32")) or cv2.contourArea(quad) < min_area:
+					continue
+				if touches_border(quad, edge_map.shape):
+					continue
+				if side_support(quad, outline_distance) >= MIN_SIDE_SUPPORT:
+					return order_corners(quad)
 		
 		raise PageNotFoundError("no page outline found")
 

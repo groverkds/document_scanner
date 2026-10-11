@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import document_scanner.document_scanner as ds
+from tests import synthetic
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -74,6 +75,66 @@ def test_order_corners_independent_of_start_and_winding(start, clockwise):
     corners = corners[start:] + corners[:start]
     approx = np.array(corners).reshape(4, 1, 2)  # the shape approxPolyDP returns
     assert ds.order_corners(approx).tolist() == [TL, TR, BR, BL]
+
+
+def test_order_corners_at_45_degrees_returns_four_distinct_corners_clockwise():
+    # A diamond: the top and left corners tie for the smallest x + y
+    diamond = np.array([[100, 0], [200, 100], [100, 200], [0, 100]])
+    for start in range(4):
+        ordered = ds.order_corners(np.roll(diamond, start, axis=0))
+        assert len({tuple(c) for c in ordered.tolist()}) == 4
+        assert ordered.tolist() in [np.roll(diamond, k, axis=0).tolist() for k in range(4)]
+
+
+# detect_page
+
+@pytest.mark.parametrize(
+    "image, truth", [pytest.param(image, truth, id=name) for name, image, truth in synthetic.easy_cases() + synthetic.hard_cases()]
+)
+def test_detect_page_finds_corners(image, truth):
+    assert synthetic.corner_error(ds.DocumentScanner().detect_page(image), truth) < 15
+
+
+@pytest.mark.parametrize("image", [pytest.param(image, id=name) for name, image in synthetic.pageless_images()])
+def test_detect_page_finds_nothing_in_pageless_images(image):
+    with pytest.raises(ds.PageNotFoundError):
+        ds.DocumentScanner().detect_page(image)
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("page.jpg", [[372, 353], [2148, 470], [2350, 2774], [398, 2977]]),
+        ("receipt.jpg", [[553, 671], [2277, 539], [2321, 1581], [720, 1836]]),
+    ],
+)
+def test_detect_page_on_samples_matches_original_detection(name, expected):
+    # Images the original Canny pass handled must give the same corners as before
+    corners = ds.DocumentScanner().detect_page(load(name))
+    assert np.max(np.abs(corners - np.array(expected))) <= 2
+
+
+def test_longest_sides_quad_recovers_cut_off_corner():
+    # A 200x300 rectangle with its top-right corner cut off diagonally
+    outline = np.array([[0, 0], [170, 0], [200, 30], [200, 300], [0, 300]], np.int32).reshape(-1, 1, 2)
+    quad = ds.longest_sides_quad(outline)
+    assert synthetic.corner_error(ds.order_corners(quad), [[0, 0], [200, 0], [200, 300], [0, 300]]) < 1
+
+
+def test_side_support_is_low_for_a_side_without_outline():
+    outline = np.full((100, 100), 255, np.uint8)
+    cv2.polylines(outline, [np.int32([[10, 90], [10, 10], [90, 10], [90, 90]])], False, 0)  # bottom side missing
+    distance = cv2.distanceTransform(outline, cv2.DIST_L2, 3)
+    quad = np.float32([[10, 10], [90, 10], [90, 90], [10, 90]])
+    assert ds.side_support(quad, distance) < ds.MIN_SIDE_SUPPORT / 2
+    cv2.line(outline, (10, 90), (90, 90), 0)
+    assert ds.side_support(quad, cv2.distanceTransform(outline, cv2.DIST_L2, 3)) == 1.0
+
+
+def test_touches_border():
+    assert ds.touches_border(np.float32([[1, 1], [399, 1], [399, 499], [1, 499]]), (500, 400))
+    assert ds.touches_border(np.float32([[50, 1], [300, 2], [300, 400], [50, 400]]), (500, 400))
+    assert not ds.touches_border(np.float32([[50, 40], [300, 40], [300, 400], [50, 400]]), (500, 400))
 
 
 # find_page / Scan without a page
