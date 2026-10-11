@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
-import sys
-import os
-import imutils
 from PIL import Image
 import pytesseract
+
+def resize_to_height(image, height):
+	ratio = height / image.shape[0]
+	return cv2.resize(image, (int(image.shape[1] * ratio), height), interpolation=cv2.INTER_AREA)
 
 class DocumentScanner:
 	def __init__(self):
@@ -16,7 +17,7 @@ class DocumentScanner:
 		
 		try:
 			ratio = image.shape[0]/500
-			image = imutils.resize(image, height = 500)
+			image = resize_to_height(image, 500)
 			gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 			gray = cv2.GaussianBlur(gray, (5,5), 0)
 			edge_map = cv2.Canny(gray, 75,200)
@@ -37,8 +38,7 @@ class DocumentScanner:
 
 	def find_page(self,edge_map):
 		
-		contours = cv2.findContours(edge_map.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-		contours = imutils.grab_contours(contours)
+		contours, _ = cv2.findContours(edge_map.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 		contours = sorted(contours, key = cv2.contourArea, reverse = True)
 		
 		for c in contours:
@@ -67,7 +67,7 @@ class DocumentScanner:
 		transform_vector = cv2.getPerspectiveTransform(np.array(page_corners,dtype="float32"), page_dim)
 		page = cv2.warpPerspective(image, transform_vector, (new_width, new_height))
 		
-		page = imutils.rotate_bound(cv2.flip(page, 0),+90)
+		page = cv2.rotate(cv2.flip(page, 0), cv2.ROTATE_90_CLOCKWISE)
 		
 		return page
 
