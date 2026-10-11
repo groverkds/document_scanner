@@ -16,3 +16,12 @@ Scanned pages are rotated so their text is upright using Tesseract's orientation
 pip install -r requirements.txt
 python3 main.py --image receipt.jpg
 ```
+
+Running tests:
+
+```
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest
+```
+
+Tests that need the Tesseract engine are skipped if it is not installed.
