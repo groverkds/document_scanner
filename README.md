@@ -1,5 +1,4 @@
 # Document Scanner
-*** No more being maintained ***
 
 Scanning documents from photographs using Python and OpenCV.
 Thanks to Adrian Rosebrock(www.pyimagesearch.com) for an awesome tutorial which enabled me to write this code.
